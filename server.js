@@ -2,7 +2,12 @@ const express = require('express');
 const { getStudentNotes } = require('./index.js');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 4000;
+
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.send('Server is running');
+});
 
 app.get('/student/:id', async (req, res) => {
   try {
@@ -14,6 +19,6 @@ app.get('/student/:id', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${port}`);
 });

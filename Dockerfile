@@ -1,4 +1,3 @@
-# Use the latest LTS version of Node.js
 FROM node:18-bullseye-slim
 
 # Install latest chrome dev package and dependencies
@@ -12,7 +11,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up working directory
-WORKDIR /usr/src/app
+WORKDIR /app
 
 # Copy package.json and package-lock.json
 COPY package*.json ./
@@ -31,4 +30,4 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 EXPOSE 3000
 
 # Start the application
-CMD [ "node", "server.js" ]
+CMD ["npm", "start"]

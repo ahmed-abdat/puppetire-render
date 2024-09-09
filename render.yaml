@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: puppeteer-app
+    env: docker
+    buildCommand: docker build -t app .
+    startCommand: docker run -p $PORT:3000 app
+    envVars:
+      - key: NODE_ENV
+        value: production
