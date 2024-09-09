@@ -31,88 +31,94 @@ const parseStudentInfo = (html) => {
 
 // Retrieve notes for all semesters of a student
 const getStudentNote = async (page) => {
-    return await page.evaluate(() => {
+    try {
+        await page.waitForSelector("select[name='ecriture:j_id125']", { visible: true, timeout: 30000 });
+
+        const semesters = await page.evaluate(() => {
+            const select = document.querySelector("select[name='ecriture:j_id125']");
+            return select ? Array.from(select.options).map(option => option.value) : [];
+        });
+
+        console.log('Semesters found:', semesters);
+
         const semesterNotes = {};
-        const dropdownSelector = "select[name='ecriture:j_id125']";
-        const select = document.querySelector(dropdownSelector);
-        const semesters = select ? Array.from(select.options).map(option => option.value) : [];
-
-        const parseStudentNotes = () => {
-            const modules = [];
-            const modulesInfo = {
-                moyen: "",
-                decision: "",
-                totalCredit: "",
-            };
-
-            const modulesinfos = Array.from(document.querySelectorAll('tfoot td span.couleurTetx1')).map(el => el.textContent.trim());
-            if (modulesinfos.length >= 4) {
-                modulesInfo.moyen = modulesinfos[0];
-                modulesInfo.totalCredit = modulesinfos[1];
-                modulesInfo.decision = modulesinfos[2];
-            }
-
-            document.querySelectorAll('tbody[id="ecriture:j_id171:tb"] > tr').forEach(row => {
-                const module = {
-                    id: "",
-                    moyenModule: "",
-                    decisionModule: "",
-                    matieres: []
-                };
-
-                const moduleFooter = row.querySelector('tfoot');
-                module.id = moduleFooter.querySelector('td span.couleurTetx').textContent.trim().replace('Moyenne Module', '');
-                const footerSpans = moduleFooter.querySelectorAll('td span.couleurTetx1');
-                module.moyenModule = footerSpans[1]?.textContent.trim() || '';
-                module.decisionModule = footerSpans[2]?.textContent.trim() || '';
-
-                row.querySelectorAll('tbody tr').forEach(tr => {
-                    const spans = tr.querySelectorAll('td span.couleurTetx1');
-                    const matiere = {
-                        name: spans[0]?.textContent.trim() || '',
-                        credit: parseFloat(spans[1]?.textContent.replace(",", ".")) || 0,
-                        noteTP: parseFloat(spans[2]?.textContent.replace(",", ".")) || 0,
-                        noteCC: parseFloat(spans[3]?.textContent.replace(",", ".")) || 0,
-                        noteFinalCheck: parseFloat(spans[4]?.textContent.replace(",", ".")) || 0,
-                        noteCatchup: parseFloat(spans[5]?.textContent.replace(",", ".")) || 0,
-                        noteFinal: parseFloat(spans[6]?.textContent.replace(",", ".")) || 0,
-                        decision: spans[7]?.textContent.trim() || ''
-                    };
-                    if (matiere.name && matiere.decision) {
-                        module.matieres.push(matiere);
-                    }
-                });
-                modules.push(module);
-            });
-
-            return {
-                modules,
-                modulesInfo
-            };
-        };
 
         for (let semester of semesters) {
             if (!semester) continue;
 
-            const select = document.querySelector(dropdownSelector);
-            select.value = semester;
-            const event = new Event('change', { bubbles: true });
-            select.dispatchEvent(event);
+            await page.select("select[name='ecriture:j_id125']", semester);
+            // Replace waitForTimeout with a promise-based delay
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Wait for the page to update
-            return new Promise(resolve => {
-                setTimeout(() => {
-                    const parsedNotes = parseStudentNotes();
-                    if (parsedNotes.modules.length > 0) {
-                        semesterNotes[semester] = parsedNotes;
+            const parsedNotes = await page.evaluate(() => {
+                const parseStudentNotes = () => {
+                    const modules = [];
+                    const modulesInfo = {
+                        moyen: "",
+                        decision: "",
+                        totalCredit: "",
+                    };
+
+                    const modulesinfos = Array.from(document.querySelectorAll('tfoot td span.couleurTetx1')).map(el => el.textContent.trim());
+                    if (modulesinfos.length >= 4) {
+                        modulesInfo.moyen = modulesinfos[0];
+                        modulesInfo.totalCredit = modulesinfos[1];
+                        modulesInfo.decision = modulesinfos[2];
                     }
-                    resolve(semesterNotes);
-                }, 1000); // Adjust timeout as needed
+
+                    document.querySelectorAll('tbody[id="ecriture:j_id171:tb"] > tr').forEach(row => {
+                        const module = {
+                            id: "",
+                            moyenModule: "",
+                            decisionModule: "",
+                            matieres: []
+                        };
+
+                        const moduleFooter = row.querySelector('tfoot');
+                        module.id = moduleFooter.querySelector('td span.couleurTetx').textContent.trim().replace('Moyenne Module', '');
+                        const footerSpans = moduleFooter.querySelectorAll('td span.couleurTetx1');
+                        module.moyenModule = footerSpans[1]?.textContent.trim() || '';
+                        module.decisionModule = footerSpans[2]?.textContent.trim() || '';
+
+                        row.querySelectorAll('tbody tr').forEach(tr => {
+                            const spans = tr.querySelectorAll('td span.couleurTetx1');
+                            const matiere = {
+                                name: spans[0]?.textContent.trim() || '',
+                                credit: parseFloat(spans[1]?.textContent.replace(",", ".")) || 0,
+                                noteTP: parseFloat(spans[2]?.textContent.replace(",", ".")) || 0,
+                                noteCC: parseFloat(spans[3]?.textContent.replace(",", ".")) || 0,
+                                noteFinalCheck: parseFloat(spans[4]?.textContent.replace(",", ".")) || 0,
+                                noteCatchup: parseFloat(spans[5]?.textContent.replace(",", ".")) || 0,
+                                noteFinal: parseFloat(spans[6]?.textContent.replace(",", ".")) || 0,
+                                decision: spans[7]?.textContent.trim() || ''
+                            };
+                            if (matiere.name && matiere.decision) {
+                                module.matieres.push(matiere);
+                            }
+                        });
+                        modules.push(module);
+                    });
+
+                    return {
+                        modules,
+                        modulesInfo
+                    };
+                };
+
+                return parseStudentNotes();
             });
+
+            if (parsedNotes.modules.length > 0) {
+                semesterNotes[semester] = parsedNotes;
+            }
         }
 
+        console.log('Semesters processed:', Object.keys(semesterNotes));
         return semesterNotes;
-    });
+    } catch (error) {
+        console.error('Error in getStudentNote:', error);
+        return {};
+    }
 };
 
 // Process individual student data
@@ -120,6 +126,8 @@ const processStudent = async (id, browser) => {
     const page = await browser.newPage();
 
     try {
+        console.log(`Starting to process student ID C${id}`);
+        
         await page.setRequestInterception(true);
         page.on('request', (req) => {
             if (['image', 'stylesheet', 'font'].includes(req.resourceType())) {
@@ -129,13 +137,22 @@ const processStudent = async (id, browser) => {
             }
         });
 
-        await page.goto(FST_URL, { waitUntil: 'networkidle2' });
+        console.log(`Navigating to ${FST_URL}`);
+        await page.goto(FST_URL, { waitUntil: 'networkidle2', timeout: 60000 });
         await page.setViewport({ width: 1080, height: 1024 });
 
+        console.log('Waiting for input field');
+        await page.waitForSelector("input[type='text'].rsinputTetx", { timeout: 30000 });
         await page.$eval("input[type='text'].rsinputTetx", el => el.value = "");
         await page.type("input[type='text'].rsinputTetx", `C${id}`);
-        await Promise.all([page.keyboard.press("Enter"), page.waitForNavigation({ waitUntil: 'networkidle2' })]);
+        
+        console.log('Submitting student ID');
+        await Promise.all([
+            page.keyboard.press("Enter"),
+            page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 })
+        ]);
 
+        console.log('Parsing student info');
         const html = await page.content();
         const studentInfo = parseStudentInfo(html);
 
@@ -144,12 +161,8 @@ const processStudent = async (id, browser) => {
             return null;
         }
 
+        console.log(`Processing student ID C${id}`);
         const semesterNotes = await getStudentNote(page);
-
-        if (Object.keys(semesterNotes).length === 0) {
-            console.log(`No semester data found for student ID C${id}.`);
-            return null;
-        }
 
         return {
             id: `C${id}`,
@@ -159,7 +172,7 @@ const processStudent = async (id, browser) => {
             semesters: semesterNotes
         };
     } catch (error) {
-        console.error(`Error processing student ID C${id}: ${error.message}`);
+        console.error(`Error processing student ID C${id}:`, error);
         return null;
     } finally {
         await page.close();
@@ -182,7 +195,8 @@ const getStudentNotes = async (studentId) => {
         const studentDetails = await processStudent(studentId, browser);
 
         if (!studentDetails) {
-            throw new Error(`Unable to retrieve data for student ID C${studentId}`);
+            console.error(`Unable to retrieve data for student ID C${studentId}`);
+            return null;
         }
 
         return studentDetails;
@@ -191,19 +205,5 @@ const getStudentNotes = async (studentId) => {
     }
 };
 
-const scrapeMultipleStudents = async (ids) => {
-    const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--dns-prefetch-disable'],
-        defaultViewport: null,
-    });
-    
-    try {
-        const results = await Promise.all(ids.map(id => processStudent(id, browser)));
-        return results.filter(result => result !== null);
-    } finally {
-        await browser.close();
-    }
-};
 
-module.exports = { getStudentNotes, scrapeMultipleStudents };
+module.exports = { getStudentNotes };
