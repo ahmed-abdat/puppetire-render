@@ -2,7 +2,7 @@ const express = require('express');
 const { getStudentNotes } = require('./index.js');
 
 const app = express();
-const port = 3000; // You can change this port if needed
+const port = process.env.PORT || 3000;
 
 app.get('/student/:id', async (req, res) => {
   try {
