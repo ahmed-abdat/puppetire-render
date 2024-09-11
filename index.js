@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');
+require('dotenv').config();
 
 const FST_URL = 'http://resultats.una.mr/FST/';
 
@@ -47,65 +48,66 @@ const getStudentNote = async (page) => {
             if (!semester) continue;
 
             await page.select("select[name='ecriture:j_id125']", semester);
-            // Replace waitForTimeout with a promise-based delay
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             const parsedNotes = await page.evaluate(() => {
-                const parseStudentNotes = () => {
-                    const modules = [];
-                    const modulesInfo = {
-                        moyen: "",
-                        decision: "",
-                        totalCredit: "",
+                const modules = [];
+                const modulesInfo = {
+                    moyen: "",
+                    decision: "",
+                    totalCredit: "",
+                };
+
+                const modulesInfoSpans = document.querySelectorAll('tfoot td span.couleurTetx1');
+                if (modulesInfoSpans.length >= 4) {
+                    modulesInfo.moyen = modulesInfoSpans[0].textContent.trim();
+                    modulesInfo.totalCredit = `${modulesInfoSpans[2].textContent.trim()}/${modulesInfoSpans[3].textContent.trim()}`;
+                    modulesInfo.decision = modulesInfoSpans[4].textContent.trim();
+                }
+
+                document.querySelectorAll('tbody[id="ecriture:j_id171:tb"] > tr').forEach(row => {
+                    const module = {
+                        id: "",
+                        moyenModule: "",
+                        decisionModule: "",
+                        matieres: []
                     };
 
-                    const modulesinfos = Array.from(document.querySelectorAll('tfoot td span.couleurTetx1')).map(el => el.textContent.trim());
-                    if (modulesinfos.length >= 4) {
-                        modulesInfo.moyen = modulesinfos[0];
-                        modulesInfo.totalCredit = modulesinfos[1];
-                        modulesInfo.decision = modulesinfos[2];
-                    }
+                    const moduleFooter = row.querySelector('tfoot');
+                    if (moduleFooter) {
+                        const moduleIdSpan = moduleFooter.querySelector('td table tbody tr td:nth-child(3) span.couleurTetx');
+                        module.id = moduleIdSpan ? moduleIdSpan.textContent.trim() : '';
 
-                    document.querySelectorAll('tbody[id="ecriture:j_id171:tb"] > tr').forEach(row => {
-                        const module = {
-                            id: "",
-                            moyenModule: "",
-                            decisionModule: "",
-                            matieres: []
-                        };
-
-                        const moduleFooter = row.querySelector('tfoot');
-                        module.id = moduleFooter.querySelector('td span.couleurTetx').textContent.trim().replace('Moyenne Module', '');
                         const footerSpans = moduleFooter.querySelectorAll('td span.couleurTetx1');
                         module.moyenModule = footerSpans[1]?.textContent.trim() || '';
                         module.decisionModule = footerSpans[2]?.textContent.trim() || '';
+                    }
 
-                        row.querySelectorAll('tbody tr').forEach(tr => {
-                            const spans = tr.querySelectorAll('td span.couleurTetx1');
+                    row.querySelectorAll('tbody tr').forEach(tr => {
+                        const spans = tr.querySelectorAll('td span.couleurTetx1');
+                        if (spans.length >= 8) {
                             const matiere = {
-                                name: spans[0]?.textContent.trim() || '',
-                                credit: parseFloat(spans[1]?.textContent.replace(",", ".")) || 0,
-                                noteTP: parseFloat(spans[2]?.textContent.replace(",", ".")) || 0,
-                                noteCC: parseFloat(spans[3]?.textContent.replace(",", ".")) || 0,
-                                noteFinalCheck: parseFloat(spans[4]?.textContent.replace(",", ".")) || 0,
-                                noteCatchup: parseFloat(spans[5]?.textContent.replace(",", ".")) || 0,
-                                noteFinal: parseFloat(spans[6]?.textContent.replace(",", ".")) || 0,
-                                decision: spans[7]?.textContent.trim() || ''
+                                name: spans[0].textContent.trim(),
+                                credit: parseFloat(spans[1].textContent.replace(",", ".")) || 0,
+                                noteTP: parseFloat(spans[2].textContent.replace(",", ".")) || 0,
+                                noteCC: parseFloat(spans[3].textContent.replace(",", ".")) || 0,
+                                noteFinalCheck: parseFloat(spans[4].textContent.replace(",", ".")) || 0,
+                                noteCatchup: parseFloat(spans[5].textContent.replace(",", ".")) || 0,
+                                noteFinal: parseFloat(spans[6].textContent.replace(",", ".")) || 0,
+                                decision: spans[7].textContent.trim()
                             };
                             if (matiere.name && matiere.decision) {
                                 module.matieres.push(matiere);
                             }
-                        });
-                        modules.push(module);
+                        }
                     });
 
-                    return {
-                        modules,
-                        modulesInfo
-                    };
-                };
+                    if (module.id || module.matieres.length > 0) {
+                        modules.push(module);
+                    }
+                });
 
-                return parseStudentNotes();
+                return { modules, modulesInfo };
             });
 
             if (parsedNotes.modules.length > 0) {
@@ -187,7 +189,8 @@ const getStudentNotes = async (studentId) => {
 
     const browser = await puppeteer.launch({
         headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--dns-prefetch-disable'],
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--dns-prefetch-disable' , '--no-zygote'],
+        executablePath: process.env.NODE_ENV === 'production' ? process.env.PUPPETEER_EXECUTABLE_PATH : puppeteer.executablePath(),
         defaultViewport: null,
     });
 

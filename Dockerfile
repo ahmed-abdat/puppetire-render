@@ -26,8 +26,6 @@ COPY . .
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-# Expose the port the app runs on
-EXPOSE 3000
 
 # Start the application
 CMD ["npm", "start"]
