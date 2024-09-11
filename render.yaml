@@ -7,3 +7,12 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+    plan: standard
+    scaling:
+      minInstances: 1
+      maxInstances: 3
+    healthCheckPath: /
+    disk:
+      name: tmp
+      mountPath: /tmp
+      sizeGB: 1

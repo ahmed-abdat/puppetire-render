@@ -10,22 +10,15 @@ RUN apt-get update \
       --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Set up working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+RUN npm ci --only=production
 
-# Copy the rest of the application code
 COPY . .
 
-# Set environment variables
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
-
-# Start the application
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
