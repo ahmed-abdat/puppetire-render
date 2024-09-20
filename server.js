@@ -4,35 +4,24 @@ const { getStudentNotes } = require('./index.js');
 
 const app = express();
 const port = process.env.PORT || 4000;
-
-// Initialize cache with a standard TTL of 1 week (in seconds)
 const cache = new NodeCache({ stdTTL: 7 * 24 * 60 * 60 });
 
-// Middleware to check cache
 const checkCache = (req, res, next) => {
-  const studentId = req.params.id;
-  const cachedData = cache.get(studentId);
-  if (cachedData) {
-    return res.json(cachedData);
-  }
-  next();
+  const cachedData = cache.get(req.params.id);
+  return cachedData ? res.json(cachedData) : next();
 };
 
-// Health check endpoint
-app.get('/', (req, res) => {
-  res.send('Server is running');
-});
+app.get('/', (_, res) => res.send('Server is running'));
 
 app.get('/student/:id', checkCache, async (req, res) => {
   try {
-    const studentId = req.params.id;
-    console.time(`Processing student ${studentId}`);
-    const studentNotes = await getStudentNotes(studentId);
-    console.timeEnd(`Processing student ${studentId}`);
+    const { id } = req.params;
+    console.time(`Processing student ${id}`);
+    const studentNotes = await getStudentNotes(id);
+    console.timeEnd(`Processing student ${id}`);
 
     if (studentNotes) {
-      // Cache the result
-      cache.set(studentId, studentNotes);
+      cache.set(id, studentNotes);
     }
 
     res.json(studentNotes || { error: 'Student not found' });
@@ -42,11 +31,6 @@ app.get('/student/:id', checkCache, async (req, res) => {
   }
 });
 
-// Cache stats endpoint
-app.get('/cache-stats', (req, res) => {
-  res.json(cache.getStats());
-});
+app.get('/cache-stats', (_, res) => res.json(cache.getStats()));
 
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
+app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
